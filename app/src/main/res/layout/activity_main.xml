@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#101317"
+    android:fillViewport="true"
     android:padding="14dp">
 
     <LinearLayout
@@ -60,7 +61,7 @@
                 android:layout_height="52dp" />
         </LinearLayout>
 
-        <!-- Yuvarlak Potansiyometreler (Volume, Bass, 3D, Preamp) -->
+        <!-- Yuvarlak Potansiyometreler (Volume, Preamp, Bass, 3D, Balance) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -101,6 +102,20 @@
 
                 <com.custom.musicvolumeeq.RotaryKnobView
                     android:id="@+id/knobVirtualizer"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <!-- Yeni Eklenen Sol/Sağ Balans Potu -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="135dp"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+
+                <com.custom.musicvolumeeq.RotaryKnobView
+                    android:id="@+id/knobBalance"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1" />
