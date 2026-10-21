@@ -19,6 +19,7 @@ class RotaryKnobView @JvmOverloads constructor(
     var max: Int = 100
     var label: String = "KNOB"
     var activeColor: Int = Color.parseColor("#00E676")
+    var isCentered: Boolean = false // Balans için orta nokta modu
     var onProgressChanged: ((Int) -> Unit)? = null
 
     private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -74,20 +75,26 @@ class RotaryKnobView @JvmOverloads constructor(
 
         arcRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
 
-        // Dış LED izi (135 dereceden başlayıp 270 derece döner)
         canvas.drawArc(arcRect, 135f, 270f, false, trackPaint)
 
-        // Aktif seviye yayı
         activePaint.color = activeColor
         val sweepAngle = (progress.toFloat() / max) * 270f
-        canvas.drawArc(arcRect, 135f, sweepAngle, false, activePaint)
 
-        // Potansiyometre gövdesi
+        if (isCentered) {
+            // Balans modu: Merkezden (135° + 135° = 270°'nin ortası) sağa veya sola yay çizer
+            val centerAngle = 135f + 135f
+            val currentAngle = 135f + sweepAngle
+            val startDraw = min(centerAngle, currentAngle)
+            val sweepDraw = abs(currentAngle - centerAngle)
+            canvas.drawArc(arcRect, startDraw, sweepDraw, false, activePaint)
+        } else {
+            canvas.drawArc(arcRect, 135f, sweepAngle, false, activePaint)
+        }
+
         val innerRadius = radius - 16f
         canvas.drawCircle(cx, cy, innerRadius, knobBodyPaint)
         canvas.drawCircle(cx, cy, innerRadius, knobBorderPaint)
 
-        // Potansiyometre üzerindeki yön çizgisi
         indicatorPaint.color = activeColor
         val angleDeg = 135f + sweepAngle
         val angleRad = Math.toRadians(angleDeg.toDouble())
@@ -97,9 +104,18 @@ class RotaryKnobView @JvmOverloads constructor(
         val stopY = cy + (innerRadius * 0.82f) * sin(angleRad).toFloat()
         canvas.drawLine(startX, startY, stopX, stopY, indicatorPaint)
 
-        // Merkezde yüzde gösterimi ve alt etiket
-        val pct = ((progress.toFloat() / max) * 100).toInt()
-        canvas.drawText("%$pct", cx, cy + 8f, textPaint)
+        val displayText = if (isCentered) {
+            val balanceVal = progress - (max / 2)
+            when {
+                balanceVal < 0 -> "L ${abs(balanceVal)}%"
+                balanceVal > 0 -> "R $balanceVal%"
+                else -> "MERKEZ"
+            }
+        } else {
+            "%${((progress.toFloat() / max) * 100).toInt()}"
+        }
+
+        canvas.drawText(displayText, cx, cy + 8f, textPaint)
         canvas.drawText(label, cx, height - 6f, subTextPaint)
     }
 
