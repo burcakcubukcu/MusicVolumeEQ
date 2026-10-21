@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var minEqLevel: Short = -1500
     private var maxEqLevel: Short = 1500
 
-    private var currentBalance: Int = 50 // 0 = Tam Sol, 50 = Merkez, 100 = Tam Sağ
+    private var currentBalance: Int = 50
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,12 +91,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Sol / Sağ Balans Düğmesi
         val knobBalance = findViewById<RotaryKnobView>(R.id.knobBalance).apply {
             label = "BALANS (L / R)"
             activeColor = Color.parseColor("#E040FB")
             max = 100
-            progress = 50 // Varsayılan merkez
+            progress = 50
             isCentered = true
             onProgressChanged = { bal ->
                 currentBalance = bal
@@ -237,14 +236,6 @@ class MainActivity : AppCompatActivity() {
     private fun syncSeekBarsWithEq() {
         val eq = equalizer ?: return
         for (i in 0 until eq.numberOfBands) {
-            bandSeekBars[i].progress = eq.getBandLevel(i.toShort()) - minEqLine()
-        }
-    }
-
-    // Uyumlu olması için yardımcı metod
-    private fun syncSeekBarsWithEq() {
-        val eq = equalizer ?: return
-        for (i in 0 until eq.numberOfBands) {
             bandSeekBars[i].progress = eq.getBandLevel(i.toShort()) - minEqLevel
         }
     }
@@ -277,7 +268,6 @@ class MainActivity : AppCompatActivity() {
                         }
                         var rawL = ((sumL / (waveform.size / 2)) * 2.0f).toInt()
 
-                        // Balans ayarına göre L kanalını ölçekle (L kanalı yüksekse balans ile kısılabilir)
                         val balanceMultiplier = if (currentBalance < 50) {
                             currentBalance / 50f
                         } else {
