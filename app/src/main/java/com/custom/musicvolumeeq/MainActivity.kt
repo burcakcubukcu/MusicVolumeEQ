@@ -33,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private var minEqLevel: Short = -1500
     private var maxEqLevel: Short = 1500
 
+    private var currentBalance: Int = 50 // 0 = Tam Sol, 50 = Merkez, 100 = Tam Sağ
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -62,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         val knobPreamp = findViewById<RotaryKnobView>(R.id.knobPreamp).apply {
             label = "PREAMP (+dB)"
             activeColor = Color.parseColor("#FF1744")
-            max = 3000 // +30 dB'e kadar kazanç
+            max = 3000
             progress = 0
             onProgressChanged = { gain ->
                 loudnessEnhancer?.setTargetGain(gain)
@@ -88,10 +90,22 @@ class MainActivity : AppCompatActivity() {
                 virtualizer?.setStrength(strength.toShort())
             }
         }
+
+        // Sol / Sağ Balans Düğmesi
+        val knobBalance = findViewById<RotaryKnobView>(R.id.knobBalance).apply {
+            label = "BALANS (L / R)"
+            activeColor = Color.parseColor("#E040FB")
+            max = 100
+            progress = 50 // Varsayılan merkez
+            isCentered = true
+            onProgressChanged = { bal ->
+                currentBalance = bal
+            }
+        }
     }
 
     private fun setupAudioEffects() {
-        val sessionId = 0 // Global medya çıkışı
+        val sessionId = 0
 
         try {
             equalizer = Equalizer(0, sessionId).apply { enabled = true }
@@ -163,7 +177,6 @@ class MainActivity : AppCompatActivity() {
             container.addView(row)
         }
 
-        // Hazır Profiller
         val presetsList = mutableListOf<String>()
         for (i in 0 until eq.numberOfPresets) {
             presetsList.add(eq.getPresetName(i.toShort()))
@@ -180,7 +193,6 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Flat (Sıfırlama) Butonu
         findViewById<Button>(R.id.btnFlat).setOnClickListener {
             for (i in 0 until numBands) {
                 eq.setBandLevel(i.toShort(), 0)
@@ -188,23 +200,21 @@ class MainActivity : AppCompatActivity() {
             syncSeekBarsWithEq()
         }
 
-        // SSB / Vokal Dar Bant Filtresi (300Hz altı ve 3kHz üstünü keser, orta sesleri öne çıkarır)
         findViewById<Button>(R.id.btnVoiceFilter).setOnClickListener {
             for (i in 0 until numBands) {
                 val band = i.toShort()
                 val freqHz = eq.getCenterFreq(band) / 1000
                 val targetLevel = when {
-                    freqHz < 250 -> minEqLevel // Alt uğultuyu kes
-                    freqHz in 300..3200 -> (maxEqLevel * 0.6).toInt().toShort() // Konuşma bandını yükselt
-                    else -> (minEqLevel * 0.8).toInt().toShort() // Tiz hışırtıyı (QRM/hiss) bastır
+                    freqHz < 250 -> minEqLevel
+                    freqHz in 300..3200 -> (maxEqLevel * 0.6).toInt().toShort()
+                    else -> (minEqLevel * 0.8).toInt().toShort()
                 }
                 eq.setBandLevel(band, targetLevel)
             }
             syncSeekBarsWithEq()
-            Toast.makeText(this, "SSB / Vokal Filtresi (300Hz-3kHz) Aktif", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "SSB / Vokal Filtresi Aktif", Toast.LENGTH_SHORT).show()
         }
 
-        // HPF (Alt Uğultu / Sub-Bass Kesici)
         findViewById<Button>(R.id.btnSubBassCut).setOnClickListener {
             for (i in 0 until numBands) {
                 val band = i.toShort()
@@ -213,10 +223,9 @@ class MainActivity : AppCompatActivity() {
                 eq.setBandLevel(band, targetLevel)
             }
             syncSeekBarsWithEq()
-            Toast.makeText(this, "150Hz Altı Uğultu Kesici (HPF) Aktif", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "150Hz Altı Uğultu Kesici Aktif", Toast.LENGTH_SHORT).show()
         }
 
-        // Master Aç/Kapat
         findViewById<Switch>(R.id.switchEqEnable).setOnCheckedChangeListener { _, isChecked ->
             equalizer?.enabled = isChecked
             bassBoost?.enabled = isChecked
@@ -225,6 +234,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun syncSeekBarsWithEq() {
+        val eq = equalizer ?: return
+        for (i in 0 until eq.numberOfBands) {
+            bandSeekBars[i].progress = eq.getBandLevel(i.toShort()) - minEqLine()
+        }
+    }
+
+    // Uyumlu olması için yardımcı metod
     private fun syncSeekBarsWithEq() {
         val eq = equalizer ?: return
         for (i in 0 until eq.numberOfBands) {
@@ -258,7 +275,15 @@ class MainActivity : AppCompatActivity() {
                         for (i in 0 until waveform.size / 2) {
                             sumL += abs((waveform[i].toInt() and 0xFF) - 128)
                         }
-                        val levelL = ((sumL / (waveform.size / 2)) * 2.0f).toInt().coerceIn(5, 100)
+                        var rawL = ((sumL / (waveform.size / 2)) * 2.0f).toInt()
+
+                        // Balans ayarına göre L kanalını ölçekle (L kanalı yüksekse balans ile kısılabilir)
+                        val balanceMultiplier = if (currentBalance < 50) {
+                            currentBalance / 50f
+                        } else {
+                            1.0f + ((currentBalance - 50) / 50f) * 0.5f
+                        }
+                        val levelL = (rawL * balanceMultiplier).toInt().coerceIn(5, 100)
                         ledVuMeter.leftLevel = levelL
                     }
 
@@ -268,15 +293,20 @@ class MainActivity : AppCompatActivity() {
                         for (i in 2 until fft.size step 2) {
                             sumR += hypot(fft[i].toDouble(), fft[i + 1].toDouble()).toFloat()
                         }
-                        val levelR = ((sumR / (fft.size / 2)) * 2.8f).toInt().coerceIn(5, 100)
+                        var rawR = ((sumR / (fft.size / 2)) * 2.8f).toInt()
+
+                        val balanceMultiplierR = if (currentBalance > 50) {
+                            (100 - currentBalance) / 50f
+                        } else {
+                            1.0f + ((50 - currentBalance) / 50f) * 0.5f
+                        }
+                        val levelR = (rawR * balanceMultiplierR).toInt().coerceIn(5, 100)
                         ledVuMeter.rightLevel = levelR
                     }
                 }, Visualizer.getMaxCaptureRate() / 2, true, true)
                 enabled = true
             }
-        } catch (e: Exception) {
-            // Cihaz kısıtlaması varsa varsayılan gösterimde kalır
-        }
+        } catch (e: Exception) {}
     }
 
     override fun onDestroy() {
