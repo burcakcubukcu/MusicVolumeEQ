@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.custom.musicvolumeeq">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Ses motoru ve canlı VU Metre için gerekli izinler -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
